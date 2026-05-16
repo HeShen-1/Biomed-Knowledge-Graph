@@ -1,6 +1,9 @@
 from tasks.celery_app import celery_app
 from ingest.sources.pubmed import PubMedIngester
 from ingest.sources.uniprot import UniProtIngester
+from ingest.sources.chembl import ChEMBLIngester
+from ingest.sources.opentargets import OpenTargetsIngester
+from ingest.sources.string import StringIngester
 from ingest.pipeline import Pipeline
 
 
@@ -10,6 +13,9 @@ def sync_source(source: str):
     ingesters = {
         "pubmed": PubMedIngester,
         "uniprot": UniProtIngester,
+        "chembl": ChEMBLIngester,
+        "opentargets": OpenTargetsIngester,
+        "string": StringIngester,
     }
     ingester_cls = ingesters.get(source)
     if not ingester_cls:
