@@ -1,0 +1,11 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+.worktrees/
+.superpowers/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+coverage/
