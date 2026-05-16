@@ -1,0 +1,30 @@
+[importlinter]
+root_package = app
+include_external_packages = False
+
+[importlinter:contract:1]
+name = services-dont-import-fastapi
+type = forbidden
+source_modules =
+    app.services
+forbidden_modules =
+    fastapi
+    starlette
+
+[importlinter:contract:2]
+name = repositories-dont-import-services
+type = forbidden
+source_modules =
+    app.repositories
+forbidden_modules =
+    app.services
+
+[importlinter:contract:3]
+name = models-no-internal-imports
+type = forbidden
+source_modules =
+    app.models
+forbidden_modules =
+    app.routers
+    app.services
+    app.repositories
