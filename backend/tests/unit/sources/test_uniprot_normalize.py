@@ -31,6 +31,8 @@ def test_uniprot_empty_record_returns_none():
 def test_uniprot_build_queries():
     ingester = UniProtIngester()
     result = ingester.normalize(SAMPLE)
-    queries = ingester.build_queries([result])
-    assert len(queries) > 0
-    assert any("MERGE" in q for q in queries)
+    statements = ingester.build_queries([result])
+    assert len(statements) > 0
+    assert isinstance(statements[0], tuple)
+    assert "MERGE" in statements[0][0]
+    assert isinstance(statements[0][1], dict)

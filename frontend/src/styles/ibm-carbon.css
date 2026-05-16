@@ -3,7 +3,8 @@
   --color-on-primary: #ffffff;
   --color-ink: #161616;
   --color-ink-muted: #525252;
-  --color-ink-subtle: #8c8c8c;
+  --color-ink-subtle: #6f6f6f;
+  --color-warning-text: #8a6d14;
   --color-canvas: #ffffff;
   --color-surface-1: #f4f4f4;
   --color-surface-2: #e0e0e0;
@@ -48,6 +49,10 @@ button {
   transition: background-color 0.15s;
 }
 button:hover { background: var(--color-surface-1); }
+button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 button.primary { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
 button.primary:hover { background: #0043ce; }
 

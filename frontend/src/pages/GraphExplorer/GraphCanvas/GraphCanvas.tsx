@@ -13,7 +13,7 @@ export function GraphCanvas() {
     if (data && data.nodes.length > 0) {
       setSubgraph(data.nodes, data.edges || []);
     }
-  }, [data, setSubgraph]);
+  }, [data]);
 
   return (
     <div className="card">

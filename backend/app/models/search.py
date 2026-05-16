@@ -16,7 +16,7 @@ class Suggestion(BaseModel):
 class SearchParams(BaseModel):
     q: str
     type: Optional[str] = None
-    min_relevance: float = 0.3
+    min_relevance: float = 0.01
     limit: int = 20
 
 class TopEntitiesParams(BaseModel):

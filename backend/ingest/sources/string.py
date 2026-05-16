@@ -10,15 +10,15 @@ class StringIngester(BaseIngester):
 
     async def fetch(self, since: datetime) -> AsyncIterator[dict]:
         import httpx
-        base_url = "https://string-db.org/api/json/network"
-        params = {
-            "identifiers": "9606.%0A",  # Get all human PPI
-            "species": 9606,
-            "required_score": 700,  # minimum 0.7 score
-            "limit": self.batch_size,
-        }
+        url = (
+            "https://string-db.org/api/json/network"
+            "?identifiers=9606.%0A"
+            f"&species=9606"
+            f"&required_score=700"
+            f"&limit={self.batch_size}"
+        )
         async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.get(base_url, params=params)
+            response = await client.get(url)
             data = response.json()
             for row in data:
                 yield row
@@ -53,22 +53,3 @@ class StringIngester(BaseIngester):
             source=self.source_name, fetched_at=datetime.now(timezone.utc),
         )
 
-    def build_queries(self, batch: list[NormalizedRecord]) -> list[str]:
-        queries: list[str] = []
-        for record in batch:
-            for node in record.nodes:
-                parts = []
-                for k, v in node.properties.items():
-                    if v is not None:
-                        parts.append(f"n.{k} = '{v}'" if isinstance(v, str) else f"n.{k} = {v}")
-                props_str = ", ".join(parts)
-                queries.append(
-                    f"MERGE (n:Protein {{id: '{node.id}'}}) "
-                    f"ON CREATE SET {props_str} ON MATCH SET {props_str}"
-                )
-            for edge in record.edges:
-                queries.append(
-                    f"MATCH (a {{id: '{edge.from_id}'}}), (b {{id: '{edge.to_id}'}}) "
-                    f"MERGE (a)-[:{edge.relation}]->(b)"
-                )
-        return queries

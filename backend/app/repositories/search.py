@@ -5,12 +5,13 @@ from app.models.search import SearchResult, Suggestion
 async def search_entities(query: str, entity_type: str | None, min_relevance: float, limit: int) -> list[SearchResult]:
     pool = await get_pg_pool()
     rows = await pool.fetch("""
+        WITH q AS (SELECT websearch_to_tsquery('english', $1) AS tq)
         SELECT id, type, label, description,
-               ts_rank(search_vector, websearch_to_tsquery('english', $1)) AS relevance
-        FROM entities_search
+               ts_rank(search_vector, q.tq) AS relevance
+        FROM entities_search, q
         WHERE ($2::text IS NULL OR type = $2)
-          AND search_vector @@ websearch_to_tsquery('english', $1)
-          AND ts_rank(search_vector, websearch_to_tsquery('english', $1)) >= $3
+          AND search_vector @@ q.tq
+          AND ts_rank(search_vector, q.tq) >= $3
         ORDER BY relevance DESC
         LIMIT $4
     """, query, entity_type, min_relevance, limit)

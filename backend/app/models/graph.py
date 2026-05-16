@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Literal
 
-NodeType = Literal["gene", "protein", "compound", "disease", "article"]
+NodeType = Literal["gene", "protein", "compound", "disease", "article", "unknown"]
 
 
 class NodeModel(BaseModel):

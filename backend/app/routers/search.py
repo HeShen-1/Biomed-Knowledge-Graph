@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/search", tags=["search"])
 async def search(
     q: str = Query(min_length=1),
     type: str | None = Query(default=None),
-    min_relevance: float = Query(default=0.3, ge=0.0, le=1.0),
+    min_relevance: float = Query(default=0.01, ge=0.0, le=1.0),
     limit: int = Query(default=20, ge=1, le=100),
 ):
     params = SearchParams(q=q, type=type, min_relevance=min_relevance, limit=limit)

@@ -81,27 +81,3 @@ class OpenTargetsIngester(BaseIngester):
             source=self.source_name, fetched_at=datetime.now(timezone.utc),
         )
 
-    def build_queries(self, batch: list[NormalizedRecord]) -> list[str]:
-        queries: list[str] = []
-        for record in batch:
-            for node in record.nodes:
-                parts = []
-                for k, v in node.properties.items():
-                    if v is not None:
-                        if isinstance(v, str):
-                            parts.append(f"n.{k} = '{v}'")
-                        elif isinstance(v, list):
-                            parts.append(f"n.{k} = {v}")
-                        else:
-                            parts.append(f"n.{k} = {v}")
-                props_str = ", ".join(parts)
-                queries.append(
-                    f"MERGE (n:{node.type.capitalize()} {{id: '{node.id}'}}) "
-                    f"ON CREATE SET {props_str} ON MATCH SET {props_str}"
-                )
-            for edge in record.edges:
-                queries.append(
-                    f"MATCH (a {{id: '{edge.from_id}'}}), (b {{id: '{edge.to_id}'}}) "
-                    f"MERGE (a)-[:{edge.relation}]->(b)"
-                )
-        return queries

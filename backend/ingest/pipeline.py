@@ -5,6 +5,7 @@ from typing import AsyncIterator
 from ingest.base import BaseIngester
 from ingest.models import NormalizedRecord
 from ingest.serializers import batch_write
+from ingest.search_sync import sync_search_index
 from ingest.stats import collect_stats
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ class Pipeline:
             try:
                 record = self.ingester.normalize(raw)
             except Exception:
-                logger.warning("normalize failed for record in %s", self.ingester.source_name)
+                logger.warning("normalize failed for record in %s", self.ingester.source_name, exc_info=True)
                 stats["failed"] += 1
                 continue
 
@@ -48,7 +49,6 @@ class Pipeline:
             try:
                 async for record in self.ingester.fetch(since):
                     yield record
-                    await asyncio.sleep(1.0 / self.rate_limit)
                 return
             except Exception:
                 logger.error("fetch attempt %d failed for %s", attempt + 1, self.ingester.source_name)
@@ -65,3 +65,8 @@ class Pipeline:
         except Exception:
             stats["failed"] += len(batch)
             logger.exception("batch write failed for %s", self.ingester.source_name)
+
+        try:
+            await sync_search_index(batch)
+        except Exception:
+            logger.exception("search index sync failed for %s", self.ingester.source_name)

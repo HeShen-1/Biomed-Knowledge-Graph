@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.errors import AppError, app_error_handler
+from app.config import validate_config_on_startup
 
 app = FastAPI(title="Biomed Knowledge Graph API", version="0.1.0")
 
@@ -13,6 +14,12 @@ app.add_middleware(
 )
 
 app.add_exception_handler(AppError, app_error_handler)
+
+
+@app.on_event("startup")
+async def startup():
+    validate_config_on_startup()
+
 
 from app.routers import graph, search, ingest
 app.include_router(graph.router)

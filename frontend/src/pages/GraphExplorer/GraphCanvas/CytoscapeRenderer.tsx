@@ -1,13 +1,10 @@
-import { useEffect, useRef } from 'react';
-import cytoscape, { type Core } from 'cytoscape';
+import { useEffect, useRef, useCallback } from 'react';
+import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
 import { useGraphStore } from '@/store/graphStore';
 
 const TYPE_COLORS: Record<string, string> = {
-  gene: '#0f62fe',
-  protein: '#24a148',
-  compound: '#da1e28',
-  disease: '#f1c21b',
-  article: '#8c8c8c',
+  gene: '#0f62fe', protein: '#24a148', compound: '#da1e28',
+  disease: '#f1c21b', article: '#8c8c8c',
 };
 
 export function CytoscapeRenderer() {
@@ -18,49 +15,42 @@ export function CytoscapeRenderer() {
   const layout = useGraphStore((s) => s.layout);
   const setSelectedNode = useGraphStore((s) => s.setSelectedNode);
 
+  const handleSelect = useCallback((evt: cytoscape.EventObject) => {
+    const node = evt.target;
+    setSelectedNode({
+      id: node.id(),
+      type: node.data('type') ?? 'unknown',
+      properties: { label: node.data('label') },
+    });
+  }, [setSelectedNode]);
+
   useEffect(() => {
     if (!containerRef.current || cyRef.current) return;
     cyRef.current = cytoscape({
       container: containerRef.current,
       style: [
-        {
-          selector: 'node',
-          style: { 'background-color': '#0f62fe', label: 'data(label)', 'font-size': '10px', 'text-valign': 'bottom', 'text-halign': 'center' },
-        },
-        { selector: 'node[type="gene"]', style: { 'background-color': TYPE_COLORS.gene } },
-        { selector: 'node[type="protein"]', style: { 'background-color': TYPE_COLORS.protein } },
-        { selector: 'node[type="compound"]', style: { 'background-color': TYPE_COLORS.compound } },
-        { selector: 'node[type="disease"]', style: { 'background-color': TYPE_COLORS.disease } },
-        { selector: 'edge', style: { 'line-color': '#e0e0e0', 'width': 1, 'target-arrow-color': '#e0e0e0', 'target-arrow-shape': 'triangle' } },
+        { selector: 'node', style: { 'background-color': '#0f62fe', label: 'data(label)', 'font-size': '10px', 'text-valign': 'bottom', 'text-halign': 'center' } },
+        ...Object.entries(TYPE_COLORS).map(([type, color]) => ({ selector: `node[type="${type}"]`, style: { 'background-color': color } })),
+        { selector: 'edge', style: { 'line-color': '#e0e0e0', width: 1, 'target-arrow-color': '#e0e0e0', 'target-arrow-shape': 'triangle' } },
       ],
     });
-
-    cyRef.current.on('tap', 'node', (evt) => {
-      const node = evt.target;
-      setSelectedNode({
-        id: node.id(),
-        type: node.data('type') ?? 'unknown',
-        properties: { label: node.data('label') },
-      });
-    });
-
+    cyRef.current.on('tap', 'node', handleSelect);
     return () => { cyRef.current?.destroy(); cyRef.current = null; };
-  }, []);
+  }, [handleSelect]);
 
   useEffect(() => {
     const cy = cyRef.current;
-    if (!cy) return;
-    cy.elements().remove();
-    nodes.forEach((n) => {
-      cy.add({ group: 'nodes', data: { id: n.id, type: n.type, label: (n.properties as any)?.label ?? n.id } });
-    });
-    edges.forEach((e) => {
-      const srcId = e.node?.id ?? e.properties?.source_id ?? '';
-      const tgtId = e.properties?.target_id ?? '';
-      if (srcId && tgtId) {
-        cy.add({ group: 'edges', data: { id: `${srcId}-${tgtId}`, source: srcId, target: tgtId, label: e.relation } });
-      }
-    });
+    if (!cy || nodes.length === 0) return;
+    const elements: ElementDefinition[] = [
+      ...nodes.map(n => ({ group: 'nodes' as const, data: { id: n.id, type: n.type, label: (n.properties as Record<string,unknown>)?.label ?? n.id } })),
+      ...edges.map(e => {
+        const srcId = e.node?.id ?? '';
+        const tgtId = (e.properties as Record<string,unknown>)?.target_id as string ?? '';
+        if (!srcId || !tgtId) return null;
+        return { group: 'edges' as const, data: { id: `${srcId}-${tgtId}-${e.relation}`, source: srcId, target: tgtId, label: e.relation } };
+      }).filter(Boolean) as ElementDefinition[],
+    ];
+    cy.json({ elements });
     cy.layout({ name: layout }).run();
   }, [nodes, edges, layout]);
 
