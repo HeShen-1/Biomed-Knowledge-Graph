@@ -37,7 +37,7 @@ Neo4j (图数据库) ← FastAPI (后端) → React + Cytoscape.js (前端)
 │   │   └── stats.py             # 同步统计
 │   ├── tasks/                   # Celery worker (solo pool for Windows)
 │   ├── migrations/              # SQL 建表/索引
-│   └── tests/                   # pytest 58 tests (unit + snapshot, all pass)
+│   └── tests/                   # pytest 83 tests (unit + integration + snapshot, all pass)
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                 # 纯 TS axios 封装 (EdgeData 含 source_id/target_id)
@@ -182,7 +182,7 @@ Article ──[:MENTIONS]──→ Gene / Disease
 |------|------|
 | 后端开发 | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload` |
 | 前端开发 | `cd frontend && npm run dev` |
-| 后端测试 | `cd backend && python -m pytest tests/ -v` (58 pass) |
+| 后端测试 | `cd backend && python -m pytest tests/ -v` (83 pass) |
 | 前端测试 | `cd frontend && npx vitest run` |
 | E2E 测试 | `cd frontend && npx playwright test` |
 | Python lint | `cd backend && ruff check .` |
@@ -198,10 +198,10 @@ Article ──[:MENTIONS]──→ Gene / Disease
 - ~~anime.js + cytoscape 未做代码分割~~ → 已解决（CytoscapeRenderer 通过 `React.lazy()` 懒加载）
 
 ### 待解决
-- 无应用层测试（service/router 集成测试），仅有单元测试和快照测试
+- ~~无应用层测试~~ → 已解决（25 个集成测试，TestClient + mocked Neo4j/Postgres）
 - `/api/ingest/sync` 端点未加认证保护
 - 无速率限制中间件
-- docker-compose 中 Redis 无持久化配置（AOF/RDB），Celery 任务状态重启丢失
+- ~~docker-compose Redis 无持久化~~ → 已解决（AOF + volume）
 
 ## License
 
