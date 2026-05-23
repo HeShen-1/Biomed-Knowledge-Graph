@@ -5,6 +5,7 @@ celery_app = Celery(
     "biomed_graph",
     broker=settings.redis_url,
     backend=settings.redis_url,
+    include=["tasks.sync"],
 )
 
 celery_app.conf.update(
@@ -15,4 +16,5 @@ celery_app.conf.update(
     enable_utc=True,
     task_acks_late=True,
     task_reject_on_worker_lost=True,
+    worker_pool="solo",
 )

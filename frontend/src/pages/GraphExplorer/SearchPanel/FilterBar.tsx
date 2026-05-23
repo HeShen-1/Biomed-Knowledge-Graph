@@ -14,17 +14,23 @@ interface Props {
 
 export function FilterBar({ selectedType, onChange }: Props) {
   return (
-    <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-      {ENTITY_TYPES.map((t) => (
-        <button
-          key={t.key ?? 'all'}
-          className={selectedType === t.key ? 'primary' : ''}
-          onClick={() => onChange(t.key)}
-          style={{ fontSize: 12, padding: '4px 8px' }}
-        >
-          {t.label}
-        </button>
-      ))}
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+      {ENTITY_TYPES.map((t) => {
+        const active = selectedType === t.key;
+        return (
+          <button
+            key={t.key ?? 'all'}
+            className={active ? 'primary' : 'ghost'}
+            onClick={() => onChange(t.key)}
+            style={{
+              fontSize: 11, padding: '3px 10px', borderRadius: 'var(--radius-sm)',
+              border: active ? undefined : '1px solid transparent',
+            }}
+          >
+            {t.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

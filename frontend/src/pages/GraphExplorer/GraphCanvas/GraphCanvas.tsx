@@ -1,25 +1,77 @@
-import { useEffect } from 'react';
-import { CytoscapeRenderer } from './CytoscapeRenderer';
+import { lazy, Suspense, useRef } from 'react';
+import type { Core } from 'cytoscape';
 import { LayoutControls } from './LayoutControls';
+import { CompoundNode } from './CompoundNode';
 import { useGraphStore } from '@/store/graphStore';
 import { useGraphExpand } from '@/hooks/useGraphExpand';
 
+const CytoscapeRenderer = lazy(() =>
+  import('./CytoscapeRenderer').then((m) => ({ default: m.CytoscapeRenderer }))
+);
+
+const LEGEND = [
+  { type: 'gene', label: 'Gene', color: '#0f62fe' },
+  { type: 'protein', label: 'Protein', color: '#24a148' },
+  { type: 'compound', label: 'Compound', color: '#da1e28' },
+  { type: 'disease', label: 'Disease', color: '#f1c21b' },
+  { type: 'article', label: 'Article', color: '#8b949e' },
+];
+
 export function GraphCanvas() {
   const selectedNode = useGraphStore((s) => s.selectedNode);
-  const setSubgraph = useGraphStore((s) => s.setSubgraph);
-  const { data } = useGraphExpand(selectedNode?.type ?? null, selectedNode?.id ?? null);
+  const nodes = useGraphStore((s) => s.nodes);
+  const edges = useGraphStore((s) => s.edges);
+  const layout = useGraphStore((s) => s.layout);
+  const setLayout = useGraphStore((s) => s.setLayout);
+  const cyRef = useRef<Core | null>(null);
 
-  useEffect(() => {
-    if (data && data.nodes.length > 0) {
-      setSubgraph(data.nodes, data.edges || []);
-    }
-  }, [data]);
+  useGraphExpand(selectedNode?.type ?? null, selectedNode?.id ?? null);
 
   return (
-    <div className="card">
-      <h3 style={{ fontWeight: 300, marginBottom: 'var(--space-2)' }}>Graph</h3>
-      <CytoscapeRenderer />
-      <LayoutControls />
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 'var(--space-3)' }}>
+      <div className="panel-header" style={{ marginBottom: 'var(--space-2)', paddingBottom: 'var(--space-2)' }}>
+        <h3>Graph</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <span style={{ fontSize: 11, color: 'var(--color-ink-subtle)' }}>
+            {nodes.length} nodes · {edges.length} edges
+          </span>
+          <LayoutControls layout={layout} onLayoutChange={setLayout} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 'var(--space-2)', padding: '6px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)' }}>
+        {LEGEND.map(item => (
+          <div key={item.type} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--color-ink-muted)' }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+            {item.label}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, minHeight: 420, position: 'relative' }}>
+        {nodes.length === 0 && (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            color: 'var(--color-ink-subtle)', pointerEvents: 'none', zIndex: 1,
+          }}>
+            <span style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>◉</span>
+            <span style={{ fontSize: 14, fontWeight: 300 }}>Search and select a node to explore the graph</span>
+          </div>
+        )}
+        <Suspense fallback={
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            color: 'var(--color-ink-subtle)',
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 300 }}>Loading graph renderer...</span>
+          </div>
+        }>
+          <CytoscapeRenderer cyRef={cyRef} />
+        </Suspense>
+        <CompoundNode cyRef={cyRef} />
+      </div>
     </div>
   );
 }

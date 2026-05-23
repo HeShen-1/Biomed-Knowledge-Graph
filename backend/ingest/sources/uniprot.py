@@ -17,9 +17,14 @@ class UniProtIngester(BaseIngester):
             "size": self.batch_size,
         }
         async with httpx.AsyncClient(timeout=30) as client:
-            url = f"{base_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+            url: str | None = base_url
+            first = True
             while url:
-                response = await client.get(url)
+                if first:
+                    response = await client.get(base_url, params=params)
+                    first = False
+                else:
+                    response = await client.get(url)
                 data = response.json()
                 for entry in data.get("results", []):
                     yield entry
@@ -29,7 +34,7 @@ class UniProtIngester(BaseIngester):
                 else:
                     break
 
-    def normalize(self, record: dict) -> NormalizedRecord | None:
+    async def normalize(self, record: dict) -> NormalizedRecord | None:
         accession = record.get("primaryAccession")
         if not accession:
             return None
@@ -46,12 +51,18 @@ class UniProtIngester(BaseIngester):
         length = record.get("sequence", {}).get("length", 0)
 
         comments = record.get("comments", [])
-        diseases: list[str] = []
+        diseases: list[dict] = []
         for comment in comments:
             if comment.get("commentType") == "DISEASE":
-                disease_id = comment.get("disease", {}).get("diseaseId")
-                if disease_id:
-                    diseases.append(disease_id)
+                disease = comment.get("disease", {}) or {}
+                disease_id = disease.get("diseaseId")
+                if not disease_id:
+                    continue
+                acronym = disease.get("diseaseAcronym")
+                diseases.append({
+                    "name": disease_id,
+                    "acronym": acronym,
+                })
 
         nodes: list[NormalizedNode] = [
             NormalizedNode(
@@ -69,13 +80,25 @@ class UniProtIngester(BaseIngester):
             ))
             edges.append(NormalizedEdge(
                 from_id=f"gene:{gene_name}", to_id=protein_id,
-                relation="ENCODES", properties={},
+                relation="ENCODES",
+                from_type="gene", to_type="protein",
+                properties={},
             ))
 
-        for disease_id in diseases:
+        for disease in diseases:
+            # Use acronym as stable ID, fallback to name slug
+            label = disease["name"]
+            acronym = disease["acronym"]
+            disease_node_id = f"disease:{acronym}" if acronym else f"disease:{label}"
+            nodes.append(NormalizedNode(
+                id=disease_node_id, type="disease",
+                properties={"name": label, "acronym": acronym},
+            ))
             edges.append(NormalizedEdge(
-                from_id=protein_id, to_id=f"disease:{disease_id}",
-                relation="ASSOCIATED_WITH", properties={"confidence": 0.8},
+                from_id=protein_id, to_id=disease_node_id,
+                relation="ASSOCIATED_WITH",
+                from_type="protein", to_type="disease",
+                properties={"confidence": 0.8, "source": "uniprot"},
             ))
 
         return NormalizedRecord(

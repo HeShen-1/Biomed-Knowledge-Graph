@@ -14,7 +14,7 @@ class FakeIngester(BaseIngester):
         for i in range(3):
             yield {"id": str(i), "name": f"item_{i}"}
 
-    def normalize(self, record: dict) -> NormalizedRecord | None:
+    async def normalize(self, record: dict) -> NormalizedRecord | None:
         return NormalizedRecord(
             nodes=[NormalizedNode(id=f"gene:TEST{record['id']}", type="gene", properties=record)],
             edges=[],
@@ -33,11 +33,10 @@ async def test_pipeline_runs_all_records():
          patch("ingest.pipeline.collect_stats", new_callable=AsyncMock) as mock_stats:
         mock_write.return_value = {"added": 1, "updated": 0}
         result = await pipeline.run()
-        assert mock_write.call_count == 2  # batch_size=2, 3 items = 2 batches
-        # Verify parameterized query format
+        assert mock_write.call_count == 2
         statements = mock_write.call_args[0][0]
         assert isinstance(statements, list)
-        assert isinstance(statements[0], tuple)  # (cypher, params)
+        assert isinstance(statements[0], tuple)
         assert mock_search.call_count == 2
         assert mock_stats.call_count == 1
         assert result["source"] == "test"
@@ -47,10 +46,10 @@ async def test_pipeline_runs_all_records():
 async def test_pipeline_handles_normalize_failure():
     ingester = FakeIngester()
 
-    def bad_normalize(record):
+    async def bad_normalize(record):
         if record["id"] == "1":
             raise ValueError("bad")
-        return FakeIngester.normalize(ingester, record)
+        return await FakeIngester.normalize(ingester, record)
 
     ingester.normalize = bad_normalize
     pipeline = Pipeline(ingester, rate_limit=100.0)
@@ -66,7 +65,10 @@ async def test_pipeline_handles_normalize_failure():
 @pytest.mark.asyncio
 async def test_pipeline_handles_none_normalize():
     ingester = FakeIngester()
-    ingester.normalize = lambda r: None
+    async def none_normalize(record):
+        return None
+
+    ingester.normalize = none_normalize
     pipeline = Pipeline(ingester, rate_limit=100.0)
 
     with patch("ingest.pipeline.batch_write", new_callable=AsyncMock) as mock_write, \

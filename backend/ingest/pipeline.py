@@ -24,7 +24,7 @@ class Pipeline:
 
         async for raw in self._fetch_with_retry(since):
             try:
-                record = self.ingester.normalize(raw)
+                record = await self.ingester.normalize(raw)
             except Exception:
                 logger.warning("normalize failed for record in %s", self.ingester.source_name, exc_info=True)
                 stats["failed"] += 1

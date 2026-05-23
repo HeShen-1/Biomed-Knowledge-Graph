@@ -9,6 +9,8 @@ export interface NodeData {
 export interface EdgeData {
   relation: string;
   direction: 'in' | 'out';
+  source_id: string;
+  target_id: string;
   node: NodeData;
   properties: Record<string, unknown>;
 }

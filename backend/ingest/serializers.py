@@ -1,3 +1,5 @@
+# serializers.py is the designated DB boundary layer for the ingest module.
+# Importing from app.db.neo4j here is intentional — this is where the data hits the graph.
 from app.db.neo4j import get_neo4j_driver
 
 VALID_LABELS = {"Gene", "Protein", "Compound", "Disease", "Article"}

@@ -13,7 +13,9 @@ class NodeModel(BaseModel):
 class EdgeModel(BaseModel):
     relation: str
     direction: Literal["in", "out"]
-    node: NodeModel
+    source_id: str = ""
+    target_id: str = ""
+    node: NodeModel = Field(default_factory=lambda: NodeModel(id="", type="unknown", properties={}))
     properties: dict = Field(default_factory=dict)
 
 

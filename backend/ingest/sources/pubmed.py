@@ -17,12 +17,15 @@ class PubMedIngester(BaseIngester):
         from app.config import settings
         api_key = settings.ncbi_api_key
         base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
+        # Search for biomedical articles with gene/disease terms
+        search_term = '("cancer"[MeSH] OR "breast cancer"[MeSH] OR "gene"[All Fields]) AND 2024:2026[pdat]'
         params = {
             "db": "pubmed",
-            "term": f'("{since.date().isoformat()}"[PDAT] : "3000"[PDAT])',
+            "term": search_term,
             "retmax": self.batch_size,
             "retmode": "json",
-            "sort": "pub_date",
+            "sort": "relevance",
             "api_key": api_key,
         }
         async with httpx.AsyncClient(timeout=30) as client:
@@ -45,7 +48,7 @@ class PubMedIngester(BaseIngester):
                 if record and record.get("title"):
                     yield record
 
-    def normalize(self, record: dict) -> NormalizedRecord | None:
+    async def normalize(self, record: dict) -> NormalizedRecord | None:
         title = record.get("title", "")
         abstract = record.get("abstract", "")
 
@@ -73,13 +76,17 @@ class PubMedIngester(BaseIngester):
             if len(gene) > 2:
                 edges.append(NormalizedEdge(
                     from_id=pmid, to_id=f"gene:{gene}",
-                    relation="MENTIONS", properties={"mention_type": "gene"},
+                    relation="MENTIONS",
+                    from_type="article", to_type="gene",
+                    properties={"mention_type": "gene"},
                 ))
 
         for disease in diseases:
             edges.append(NormalizedEdge(
                 from_id=pmid, to_id=f"disease:{disease}",
-                relation="MENTIONS", properties={"mention_type": "disease"},
+                relation="MENTIONS",
+                from_type="article", to_type="disease",
+                properties={"mention_type": "disease"},
             ))
 
         return NormalizedRecord(

@@ -2,8 +2,8 @@ from app.models.graph import NodeDetailResponse, SubgraphModel, ExpandParams, Pa
 from app.repositories import graph as graph_repo
 
 
-async def get_node(type_: str, id_: str) -> NodeDetailResponse:
-    return await graph_repo.get_node_detail(type_, id_)
+async def get_node(type_: str, id_: str, limit: int = 100) -> NodeDetailResponse:
+    return await graph_repo.get_node_detail(type_, id_, limit)
 
 
 async def expand(type_: str, id_: str, params: ExpandParams) -> SubgraphModel:

@@ -1,3 +1,4 @@
+import pytest
 from ingest.sources.pubmed import PubMedIngester
 
 SAMPLE = {
@@ -10,9 +11,10 @@ SAMPLE = {
 }
 
 
-def test_pubmed_normalize_snapshot():
+@pytest.mark.asyncio
+async def test_pubmed_normalize_snapshot():
     ingester = PubMedIngester()
-    result = ingester.normalize(SAMPLE)
+    result = await ingester.normalize(SAMPLE)
     assert result is not None
     assert len(result.nodes) == 1
     assert result.nodes[0].type == "article"
@@ -20,17 +22,19 @@ def test_pubmed_normalize_snapshot():
     assert result.nodes[0].properties["title"] == "BRCA1 mutations in breast cancer"
 
 
-def test_pubmed_normalize_empty_record_returns_none():
+@pytest.mark.asyncio
+async def test_pubmed_normalize_empty_record_returns_none():
     ingester = PubMedIngester()
-    result = ingester.normalize({})
+    result = await ingester.normalize({})
     assert result is None
 
 
-def test_pubmed_build_queries():
+@pytest.mark.asyncio
+async def test_pubmed_build_queries():
     ingester = PubMedIngester()
-    result = ingester.normalize(SAMPLE)
+    result = await ingester.normalize(SAMPLE)
     statements = ingester.build_queries([result])
     assert len(statements) > 0
-    assert isinstance(statements[0], tuple)  # (cypher, params)
-    assert "MERGE" in statements[0][0]       # check Cypher string
-    assert isinstance(statements[0][1], dict) # check params dict
+    assert isinstance(statements[0], tuple)
+    assert "MERGE" in statements[0][0]
+    assert isinstance(statements[0][1], dict)

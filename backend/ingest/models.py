@@ -13,6 +13,8 @@ class NormalizedEdge(BaseModel):
     to_id: str
     relation: str
     properties: dict
+    from_type: str | None = None
+    to_type: str | None = None
 
 
 class NormalizedRecord(BaseModel):

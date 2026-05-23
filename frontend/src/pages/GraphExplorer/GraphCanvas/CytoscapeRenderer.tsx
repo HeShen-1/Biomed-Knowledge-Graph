@@ -1,58 +1,307 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
-import { useGraphStore } from '@/store/graphStore';
+import { animate } from 'animejs';
+import { useCytoscapeState } from '@/hooks/useCytoscapeState';
+import { useKeyboard } from './keyboard';
+import { useBoxSelect } from './hooks/useBoxSelect';
+import { BoxSelector } from './BoxSelector';
 
 const TYPE_COLORS: Record<string, string> = {
   gene: '#0f62fe', protein: '#24a148', compound: '#da1e28',
-  disease: '#f1c21b', article: '#8c8c8c',
+  disease: '#f1c21b', article: '#8b949e',
 };
 
-export function CytoscapeRenderer() {
+const TYPE_DIMS: Record<string, number> = {
+  gene: 26, protein: 24, compound: 22, disease: 28, article: 18,
+};
+
+function shortLabel(raw: string, max = 18): string {
+  if (!raw) return '';
+  return raw.length > max ? raw.slice(0, max - 1) + '…' : raw;
+}
+
+interface CytoscapeRendererProps {
+  cyRef?: React.MutableRefObject<Core | null>;
+}
+
+export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cyRef = useRef<Core | null>(null);
-  const nodes = useGraphStore((s) => s.nodes);
-  const edges = useGraphStore((s) => s.edges);
-  const layout = useGraphStore((s) => s.layout);
-  const setSelectedNode = useGraphStore((s) => s.setSelectedNode);
+  const internalCyRef = useRef<Core | null>(null);
+  const cyRef = externalCyRef ?? internalCyRef;
+  const prevNodeIdsRef = useRef<Set<string>>(new Set());
+  const { nodes, edges, layout, setSelectedNode, theme } = useCytoscapeState();
+
+  useKeyboard(cyRef);
+  const { rect: boxRect } = useBoxSelect(cyRef.current);
+
+  const dark = theme === 'dark';
+  const canvasBg = dark ? '#0d1117' : '#ffffff';
+  const labelColor = dark ? '#c9cdd4' : '#444444';
+  const edgeColor = dark ? '#30363d' : '#c0c0c0';
+  const selectedBorder = dark ? '#ffffff' : '#161616';
+  const textOutline = dark ? '#0d1117' : '#ffffff';
 
   const handleSelect = useCallback((evt: cytoscape.EventObject) => {
     const node = evt.target;
+    const pos = node.renderedPosition();
+
+    const cy = cyRef.current;
+    if (cy) {
+      const el = cy.container();
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        animate('__cyRipple', {
+          duration: 0,
+          onComplete: () => {
+            const ripple = document.createElement('div');
+            ripple.style.cssText = `
+              position:absolute; pointer-events:none; z-index:10;
+              left:${pos.x - 16 + rect.left - el.offsetLeft}px;
+              top:${pos.y - 16 + rect.top - el.offsetTop}px;
+              width:32px; height:32px; border-radius:50%;
+              border:2px solid #fff; opacity:0.8;
+            `;
+            el.appendChild(ripple);
+            animate(ripple, {
+              scale: [1, 3.5],
+              opacity: [0.8, 0],
+              duration: 600,
+              easing: 'easeOutExpo',
+              onComplete: () => ripple.remove(),
+            });
+          },
+        });
+      }
+    }
+
     setSelectedNode({
       id: node.id(),
       type: node.data('type') ?? 'unknown',
-      properties: { label: node.data('label') },
+      properties: {
+        label: node.data('label'),
+        name: node.data('name'),
+        symbol: node.data('symbol'),
+        description: node.data('description'),
+      },
     });
   }, [setSelectedNode]);
 
   useEffect(() => {
     if (!containerRef.current || cyRef.current) return;
-    cyRef.current = cytoscape({
+    const cy = cytoscape({
       container: containerRef.current,
       style: [
-        { selector: 'node', style: { 'background-color': '#0f62fe', label: 'data(label)', 'font-size': '10px', 'text-valign': 'bottom', 'text-halign': 'center' } },
-        ...Object.entries(TYPE_COLORS).map(([type, color]) => ({ selector: `node[type="${type}"]`, style: { 'background-color': color } })),
-        { selector: 'edge', style: { 'line-color': '#e0e0e0', width: 1, 'target-arrow-color': '#e0e0e0', 'target-arrow-shape': 'triangle' } },
+        {
+          selector: 'node',
+          style: {
+            'background-color': '#0f62fe',
+            'label': 'data(label)',
+            'font-size': '9px',
+            'font-family': 'IBM Plex Sans, sans-serif',
+            'font-weight': 500 as any,
+            'color': labelColor,
+            'text-valign': 'bottom',
+            'text-halign': 'center',
+            'text-margin-y': 4,
+            'text-wrap': 'ellipsis' as any,
+            'text-max-width': '70px',
+            'min-zoomed-font-size': '7px',
+            'border-width': '1.5px',
+            'border-color': canvasBg,
+            'width': 24,
+            'height': 24,
+          },
+        },
+        ...Object.entries(TYPE_COLORS).map(([type, color]) => ({
+          selector: `node[type="${type}"]`,
+          style: {
+            'background-color': color,
+            'width': TYPE_DIMS[type] ?? 24,
+            'height': TYPE_DIMS[type] ?? 24,
+          },
+        })),
+        {
+          selector: 'node[type="compound"]',
+          style: {
+            'shape': 'diamond',
+            'background-color': '#8a3ffc',
+            'border-color': '#b379f9',
+            'border-width': '2px',
+            'width': 34,
+            'height': 34,
+            'font-size': '10px',
+            'font-weight': 'bold' as any,
+          },
+        },
+        {
+          selector: 'node:selected',
+          style: {
+            'border-width': '3px',
+            'border-color': selectedBorder,
+            'text-outline-width': '3px',
+            'text-outline-color': textOutline,
+          },
+        },
+        {
+          selector: 'edge',
+          style: {
+            'line-color': edgeColor,
+            'width': 0.8,
+            'target-arrow-color': edgeColor,
+            'target-arrow-shape': 'triangle',
+            'arrow-scale': 0.7,
+            'curve-style': 'bezier',
+          },
+        },
+        {
+          selector: 'edge[relation="INTERACTS_WITH"]',
+          style: { 'line-color': '#1f6feb33', 'width': 1.2 },
+        },
+        {
+          selector: 'edge[relation="BINDS_TO"]',
+          style: { 'line-color': '#da1e2833', 'width': 1.0 },
+        },
+        {
+          selector: 'edge[relation="TARGETS"]',
+          style: { 'line-color': '#f1c21b33', 'width': 1.0 },
+        },
       ],
+      layout: { name: 'cose' } as any,
     });
-    cyRef.current.on('tap', 'node', handleSelect);
-    return () => { cyRef.current?.destroy(); cyRef.current = null; };
+    cyRef.current = cy;
+    if (externalCyRef) externalCyRef.current = cy;
+
+    cy.on('tap', 'node', handleSelect);
+    return () => { cy.destroy(); cyRef.current = null; if (externalCyRef) externalCyRef.current = null; };
   }, [handleSelect]);
+
+  // Update theme-dependent styles
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.style()
+      .selector('node')
+      .style({ 'color': labelColor, 'text-outline-color': textOutline, 'border-color': canvasBg })
+      .selector('node:selected')
+      .style({ 'border-color': selectedBorder, 'text-outline-color': textOutline })
+      .selector('edge')
+      .style({ 'line-color': edgeColor, 'target-arrow-color': edgeColor })
+      .update();
+  }, [theme, canvasBg, labelColor, edgeColor, selectedBorder, textOutline]);
+
+  // Build elements array, memoized to avoid recreation on every render
+  const elements: ElementDefinition[] = useMemo(() => {
+    if (nodes.length === 0) return [];
+
+    return [
+      ...nodes.map(n => {
+        const props = (n.properties ?? {}) as Record<string, unknown>;
+        const label = shortLabel(String(props?.label ?? props?.name ?? props?.symbol ?? n.id));
+        const dim = TYPE_DIMS[n.type] ?? 24;
+        return {
+          group: 'nodes' as const,
+          data: {
+            id: n.id, type: n.type, label, dim,
+            name: props?.name ?? '',
+            symbol: props?.symbol ?? '',
+            description: props?.description ?? '',
+          },
+        };
+      }),
+      ...edges
+        .map((e, i) => {
+          const srcId = (e as any).source_id || e.node?.id || '';
+          const tgtId = (e as any).target_id || '';
+          if (!srcId || !tgtId) return null;
+          return {
+            group: 'edges' as const,
+            data: {
+              id: `e${i}-${srcId.slice(-12)}-${tgtId.slice(-12)}`,
+              source: srcId,
+              target: tgtId,
+              relation: e.relation,
+            },
+          };
+        })
+        .filter(Boolean) as ElementDefinition[],
+    ];
+  }, [nodes, edges]);
 
   useEffect(() => {
     const cy = cyRef.current;
-    if (!cy || nodes.length === 0) return;
-    const elements: ElementDefinition[] = [
-      ...nodes.map(n => ({ group: 'nodes' as const, data: { id: n.id, type: n.type, label: (n.properties as Record<string,unknown>)?.label ?? n.id } })),
-      ...edges.map(e => {
-        const srcId = e.node?.id ?? '';
-        const tgtId = (e.properties as Record<string,unknown>)?.target_id as string ?? '';
-        if (!srcId || !tgtId) return null;
-        return { group: 'edges' as const, data: { id: `${srcId}-${tgtId}-${e.relation}`, source: srcId, target: tgtId, label: e.relation } };
-      }).filter(Boolean) as ElementDefinition[],
-    ];
-    cy.json({ elements });
-    cy.layout({ name: layout }).run();
-  }, [nodes, edges, layout]);
+    if (!cy) return;
 
-  return <div ref={containerRef} style={{ width: '100%', height: 500, border: '1px solid var(--color-hairline)', borderRadius: 'var(--radius-md)' }} />;
+    if (elements.length === 0) {
+      // Only clear if we had previous content (prevents flash during loading transitions)
+      if (prevNodeIdsRef.current.size > 0) {
+        cy.elements().remove();
+        prevNodeIdsRef.current = new Set();
+      }
+      return;
+    }
+
+    const newNodeIds = new Set(nodes.map(n => n.id));
+    const oldIds = prevNodeIdsRef.current;
+    const isSuperset = oldIds.size > 0 && [...oldIds].every(id => newNodeIds.has(id));
+
+    if (isSuperset) {
+      // Incremental update: only add new nodes/edges, don't rebuild entire graph
+      const newNodes = elements.filter(el => el.group === 'nodes' && !oldIds.has(el.data.id!));
+      const newEdges = elements.filter(el => el.group === 'edges');
+      if (newNodes.length > 0 || newEdges.length > 0) {
+        cy.batch(() => {
+          if (newNodes.length > 0) cy.add(newNodes);
+          if (newEdges.length > 0) cy.add(newEdges);
+        });
+        const doAnimate = layout !== 'grid';
+        cy.layout({ name: layout, animate: doAnimate, animationDuration: doAnimate ? 500 : 0 } as any).run();
+      }
+    } else {
+      // Full replacement: graph structure changed (different root node)
+      const doAnimate = layout !== 'grid';
+      // Scatter initial positions near center to avoid (0,0) cluster on replacement
+      const cx = cy.width() / 2;
+      const cyH = cy.height() / 2;
+      const scatteredElements = elements.map(el => {
+        if (el.group === 'nodes') {
+          return {
+            ...el,
+            position: {
+              x: cx + (Math.random() - 0.5) * 120,
+              y: cyH + (Math.random() - 0.5) * 120,
+            },
+          };
+        }
+        return el;
+      });
+      cy.batch(() => {
+        cy.json({ elements: scatteredElements });
+      });
+      cy.layout({
+        name: layout,
+        animate: doAnimate,
+        animationDuration: doAnimate ? 600 : 0,
+        easing: 'ease-out',
+      } as any).run();
+    }
+
+    prevNodeIdsRef.current = newNodeIds;
+  }, [elements, layout]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 480 }}>
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          minHeight: 480,
+          background: canvasBg,
+          borderRadius: 'var(--radius-md)',
+          transition: 'background 0.35s ease',
+        }}
+      />
+      <BoxSelector rect={boxRect} />
+    </div>
+  );
 }

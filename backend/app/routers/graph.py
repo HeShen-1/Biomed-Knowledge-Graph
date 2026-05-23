@@ -9,10 +9,13 @@ VALID_TYPES = {"gene", "protein", "compound", "disease", "article"}
 
 
 @router.get("/node/{type}/{id}", response_model=NodeDetailResponse)
-async def get_node_detail(type: str, id: str):
+async def get_node_detail(
+    type: str, id: str,
+    limit: int = Query(default=100, ge=1, le=200),
+):
     if type not in VALID_TYPES:
         raise InvalidParamError(f"Invalid node type: {type}")
-    return await graph_svc.get_node(type, id)
+    return await graph_svc.get_node(type, id, limit)
 
 
 @router.get("/expand/{type}/{id}", response_model=SubgraphModel)
