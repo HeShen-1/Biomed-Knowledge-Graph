@@ -28,7 +28,7 @@ backend/                          # Python FastAPI
     search_sync.py                # PG entities_search sync
   tasks/                          # Celery (include=["tasks.sync"], worker_pool="solo" for Windows)
   migrations/                     # SQL DDL: entities_search, ingest_status, ingest_log
-  tests/                          # pytest 18 tests (unit + snapshot, all pass)
+  tests/                          # pytest 58 tests (unit + snapshot, all pass)
 frontend/                         # React 18 + TypeScript 5 + Vite 6
   src/
     pages/GraphExplorer/          # Three-panel layout + dark/light theme + anime.js v4 animations
@@ -105,7 +105,7 @@ This project has a CodeGraph index (`.codegraph/`). Prefer it over grep/Glob for
 |------|---------|
 | Backend dev | `cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload` |
 | Frontend dev | `cd frontend && npm run dev` |
-| Backend tests | `cd backend && python -m pytest tests/ -v` (18 pass) |
+| Backend tests | `cd backend && python -m pytest tests/ -v` (58 pass) |
 | Frontend tests | `cd frontend && npx vitest run` |
 | E2E tests | `cd frontend && npx playwright test` |
 | Python lint | `cd backend && ruff check .` |
@@ -117,15 +117,24 @@ This project has a CodeGraph index (`.codegraph/`). Prefer it over grep/Glob for
 
 ## Ingest Pipeline
 
-Sources: UniProt (gene→protein), STRING (protein-protein, 35 key genes), ChEMBL (compounds + BINDS_TO), Open Targets (gene→disease, 10 diseases), PubMed (article→gene)
+Sources: UniProt (gene→protein), STRING (protein-protein, 40 key genes), ChEMBL (compounds + BINDS_TO), Open Targets (gene→disease, 10 diseases), PubMed (article→gene)
 Flow: source → pipeline (fetch → normalize → flush via UNWIND batch) → Neo4j + Postgres
 Windows: use `--pool=solo` for Celery worker
 
 ## Known Gaps
 
-- STRING protein IDs use gene symbols, UniProt uses accessions — separate nodes, need resolver
-- ChEMBL target IDs (`protein:CHEMBL_*`) don't match UniProt accessions
-- OpenTargets limited to 1 page/disease (dev setting)
-- UniProt ASSOCIATED_WITH edges not populated (source data lacks disease comments)
-- No code splitting for anime.js + cytoscape (~700KB combined)
-- Neo4j indexes on :NodeType(id) should be verified at startup
+### Resolved
+- ~~STRING protein IDs use gene symbols, UniProt uses accessions~~ → RESOLVED (gene resolver: `ingest/resolvers/gene.py`)
+- ~~UniProt ASSOCIATED_WITH edges not populated~~ → RESOLVED (UniProt ingester parses disease comments, creates edges)
+- ~~OpenTargets limited to 1 page/disease~~ → RESOLVED (full pagination implemented)
+- ~~No code splitting for anime.js + cytoscape~~ → RESOLVED (CytoscapeRenderer lazy-loaded via `React.lazy()`)
+- ~~Neo4j indexes should be verified at startup~~ → RESOLVED (`verify_indexes()` called on startup)
+
+### Partially Resolved
+- ChEMBL target IDs (`protein:CHEMBL_*`) don't match UniProt accessions — target resolver exists (`ingest/resolvers/`) but coverage incomplete
+
+### Open
+- No app-layer (service/router) integration tests — only unit + snapshot tests
+- No authentication on `/api/ingest/sync` endpoints — open to unauthenticated triggers
+- No rate-limiting middleware — API endpoints unprotected against abuse
+- Redis in docker-compose has no persistence (AOF/RDB) — Celery task state lost on restart

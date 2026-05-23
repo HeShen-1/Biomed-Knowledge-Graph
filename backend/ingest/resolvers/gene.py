@@ -1,6 +1,8 @@
+import asyncio
 import httpx
 
 _cached: dict[str, str] = {}
+_cache_lock = asyncio.Lock()
 
 _client: httpx.AsyncClient | None = None
 
@@ -25,43 +27,50 @@ def _extract_accession(hit: dict) -> str | None:
 
 
 def _fallback(symbol: str) -> str:
-    return f"protein:{symbol.strip().upper()}"
+    key = symbol.strip().upper()
+    if not key:
+        return "protein:UNKNOWN"
+    return f"protein:{key}"
 
 
 async def resolve_gene_symbol(symbol: str) -> str:
     key = symbol.strip().upper()
     if not key:
-        return f"protein:{key}"
+        return "protein:UNKNOWN"
 
     if key in _cached:
         return _cached[key]
 
-    try:
-        client = _get_client()
-        resp = await client.get(
-            "https://mygene.info/v3/query",
-            params={
-                "q": f"symbol:{symbol}",
-                "species": "human",
-                "fields": "uniprot.Swiss-Prot",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        hits = data if isinstance(data, list) else data.get("hits", [])
-        if hits:
-            accession = _extract_accession(hits[0])
-            if accession:
-                result = f"protein:{accession}"
-                _cached[key] = result
-                return result
-        result = _fallback(symbol)
-        _cached[key] = result
-        return result
-    except (httpx.HTTPError, httpx.TimeoutException):
-        result = _fallback(symbol)
-        _cached[key] = result
-        return result
+    async with _cache_lock:
+        if key in _cached:
+            return _cached[key]
+
+        try:
+            client = _get_client()
+            resp = await client.get(
+                "https://mygene.info/v3/query",
+                params={
+                    "q": f"symbol:{symbol}",
+                    "species": "human",
+                    "fields": "uniprot.Swiss-Prot",
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            hits = data if isinstance(data, list) else data.get("hits", [])
+            if hits:
+                accession = _extract_accession(hits[0])
+                if accession:
+                    result = f"protein:{accession}"
+                    _cached[key] = result
+                    return result
+            result = _fallback(symbol)
+            _cached[key] = result
+            return result
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            result = _fallback(symbol)
+            _cached[key] = result
+            return result
 
 
 async def resolve_gene_symbols(symbols: list[str]) -> dict[str, str]:
@@ -71,7 +80,7 @@ async def resolve_gene_symbols(symbols: list[str]) -> dict[str, str]:
     for s in symbols:
         key = s.strip().upper()
         if not key:
-            results[s] = f"protein:{key}"
+            results[s] = "protein:UNKNOWN"
         elif key in _cached:
             results[s] = _cached[key]
         else:
@@ -106,17 +115,21 @@ async def resolve_gene_symbols(symbols: list[str]) -> dict[str, str]:
                 accession = _extract_accession(hit)
                 if accession:
                     found[symbol_from_query.upper()] = f"protein:{accession}"
-    except (httpx.HTTPError, httpx.TimeoutException):
+    except (httpx.HTTPError, httpx.TimeoutException, ValueError):
         found = {}
 
-    for s in symbols:
-        if s in results:
-            continue
-        key = s.strip().upper()
-        if key in found:
-            results[s] = found[key]
-        else:
-            results[s] = _fallback(s)
-        _cached[key] = results[s]
+    async with _cache_lock:
+        for s in symbols:
+            if s in results:
+                continue
+            key = s.strip().upper()
+            if key in _cached:
+                results[s] = _cached[key]
+                continue
+            if key in found:
+                results[s] = found[key]
+            else:
+                results[s] = _fallback(s)
+            _cached[key] = results[s]
 
     return results

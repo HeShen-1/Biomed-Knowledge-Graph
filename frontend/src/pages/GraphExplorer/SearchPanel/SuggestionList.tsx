@@ -32,7 +32,7 @@ export function SuggestionList({ items, onSelect, visible }: Props) {
     });
 
     return () => {
-      tl.pause();
+      tl.cancel();
     };
   }, [visible, items]);
 

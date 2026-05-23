@@ -28,3 +28,12 @@ forbidden_modules =
     app.routers
     app.services
     app.repositories
+
+[importlinter:contract:4]
+name = ingest-sources-no-app-imports
+type = forbidden
+source_modules =
+    ingest.sources
+    ingest.resolvers
+forbidden_modules =
+    app

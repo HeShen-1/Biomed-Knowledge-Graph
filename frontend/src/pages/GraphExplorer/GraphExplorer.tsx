@@ -5,6 +5,7 @@ import { GraphCanvas } from './GraphCanvas/GraphCanvas';
 import { DetailPanel } from './DetailPanel/DetailPanel';
 import { HistoryPanel } from './DetailPanel/HistoryPanel';
 import { ThemeToggle } from './ThemeToggle';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export function GraphExplorer() {
   const headerRef = useRef<HTMLDivElement>(null);
@@ -58,14 +59,22 @@ export function GraphExplorer() {
         gap: 16, padding: 16, minHeight: 0,
       }}>
         <div ref={leftRef} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', opacity: 0 }}>
-          <SearchPanel />
+          <ErrorBoundary>
+            <SearchPanel />
+          </ErrorBoundary>
         </div>
         <div ref={centerRef} style={{ minHeight: 0, opacity: 0 }}>
-          <GraphCanvas />
+          <ErrorBoundary>
+            <GraphCanvas />
+          </ErrorBoundary>
         </div>
         <div ref={rightRef} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 16, opacity: 0 }}>
-          <DetailPanel />
-          <HistoryPanel />
+          <ErrorBoundary>
+            <DetailPanel />
+          </ErrorBoundary>
+          <ErrorBoundary>
+            <HistoryPanel />
+          </ErrorBoundary>
         </div>
       </div>
     </div>

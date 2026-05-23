@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import type { Core } from 'cytoscape';
 import { LayoutControls } from './LayoutControls';
 import { CompoundNode } from './CompoundNode';
@@ -23,9 +23,9 @@ export function GraphCanvas() {
   const edges = useGraphStore((s) => s.edges);
   const layout = useGraphStore((s) => s.layout);
   const setLayout = useGraphStore((s) => s.setLayout);
-  const cyRef = useRef<Core | null>(null);
+  const [cy, setCy] = useState<Core | null>(null);
 
-  useGraphExpand(selectedNode?.type ?? null, selectedNode?.id ?? null);
+  const { isError: expandError } = useGraphExpand(selectedNode?.type ?? null, selectedNode?.id ?? null);
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 'var(--space-3)' }}>
@@ -59,6 +59,16 @@ export function GraphCanvas() {
             <span style={{ fontSize: 14, fontWeight: 300 }}>Search and select a node to explore the graph</span>
           </div>
         )}
+        {expandError && (
+          <div style={{
+            position: 'absolute', top: 8, left: 8, right: 8, zIndex: 10,
+            padding: '8px 12px', borderRadius: 'var(--radius-sm)',
+            background: 'var(--color-error-muted)', color: 'var(--color-error)',
+            fontSize: 12, display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <span>⚠</span> Failed to load graph data
+          </div>
+        )}
         <Suspense fallback={
           <div style={{
             position: 'absolute', inset: 0, display: 'flex',
@@ -68,9 +78,9 @@ export function GraphCanvas() {
             <span style={{ fontSize: 14, fontWeight: 300 }}>Loading graph renderer...</span>
           </div>
         }>
-          <CytoscapeRenderer cyRef={cyRef} />
+          <CytoscapeRenderer onReady={setCy} />
         </Suspense>
-        <CompoundNode cyRef={cyRef} />
+        <CompoundNode cy={cy} />
       </div>
     </div>
   );

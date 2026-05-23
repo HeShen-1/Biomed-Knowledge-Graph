@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import AsyncIterator
 from ingest.base import BaseIngester
 from ingest.models import NormalizedRecord, NormalizedNode, NormalizedEdge
+from ingest.resolvers.disease import resolve_disease_id
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +57,18 @@ class OpenTargetsIngester(BaseIngester):
                             "variables": {"efoId": efo_id, "index": index, "size": self.batch_size},
                         },
                     )
+                    try:
+                        resp.raise_for_status()
+                    except httpx.HTTPStatusError:
+                        logger.warning("OT HTTP error for %s: %s", efo_id, resp.status_code)
+                        break
                     data = resp.json()
-                    if data.get("errors"):
-                        logger.warning("OT error for %s: %s", efo_id, data["errors"][0]["message"][:100])
+                    errors = data.get("errors")
+                    if errors:
+                        err_msg = ""
+                        if isinstance(errors, list) and isinstance(errors[0], dict):
+                            err_msg = errors[0].get("message", "")[:100]
+                        logger.warning("OT error for %s: %s", efo_id, err_msg)
                         break
 
                     disease_data = data.get("data", {}).get("disease")
@@ -95,21 +105,27 @@ class OpenTargetsIngester(BaseIngester):
         if not gene_id or not disease_id:
             return None
 
+        # Resolve EFO to DOID for cross-source disease connectivity
+        resolved_disease = await resolve_disease_id(disease_id)
+        doid = resolved_disease.get("doid")
+        disease_node_id = f"disease:{doid}" if doid else f"disease:{disease_id}"
+        disease_label = resolved_disease.get("label") or disease_name
+
         nodes: list[NormalizedNode] = [
             NormalizedNode(
                 id=f"gene:{gene_symbol}", type="gene",
                 properties={"symbol": gene_symbol, "ensembl_id": gene_id},
             ),
             NormalizedNode(
-                id=f"disease:{disease_id}", type="disease",
-                properties={"name": disease_name},
+                id=disease_node_id, type="disease",
+                properties={"name": disease_label, "efo_id": disease_id, "doid": doid},
             ),
         ]
 
         edges: list[NormalizedEdge] = [
             NormalizedEdge(
                 from_id=f"gene:{gene_symbol}",
-                to_id=f"disease:{disease_id}",
+                to_id=disease_node_id,
                 relation="TARGETS",
                 from_type="gene", to_type="disease",
                 properties={

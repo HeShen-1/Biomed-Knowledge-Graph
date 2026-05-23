@@ -12,10 +12,12 @@ class PubMedIngester(BaseIngester):
     source_name = "pubmed"
     batch_size = 500
 
+    def __init__(self, api_key: str = ""):
+        self.ncbi_api_key = api_key
+
     async def fetch(self, since: datetime) -> AsyncIterator[dict]:
         import httpx
-        from app.config import settings
-        api_key = settings.ncbi_api_key
+        api_key = self.ncbi_api_key
         base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
         # Search for biomedical articles with gene/disease terms

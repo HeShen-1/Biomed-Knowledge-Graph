@@ -5,7 +5,7 @@ import { useUiStore } from '@/store/uiStore';
 import { useGraphStore } from '@/store/graphStore';
 
 interface CompoundNodeProps {
-  cyRef: React.MutableRefObject<Core | null>;
+  cy: Core | null;
 }
 
 interface ContextMenuState {
@@ -15,7 +15,7 @@ interface ContextMenuState {
   neighborCount: number;
 }
 
-export function CompoundNode({ cyRef }: CompoundNodeProps) {
+export function CompoundNode({ cy }: CompoundNodeProps) {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const collapseNeighbors = useUiStore((s) => s.collapseNeighbors);
@@ -23,7 +23,6 @@ export function CompoundNode({ cyRef }: CompoundNodeProps) {
   const layout = useGraphStore((s) => s.layout);
 
   useEffect(() => {
-    const cy = cyRef.current;
     if (!cy) return;
 
     const handleCxttap = (evt: EventObject) => {
@@ -50,7 +49,7 @@ export function CompoundNode({ cyRef }: CompoundNodeProps) {
 
     cy.on('cxttap', 'node', handleCxttap);
     return () => { cy.off('cxttap', 'node', handleCxttap); };
-  }, [cyRef]);
+  }, [cy]);
 
   useEffect(() => {
     if (!menu) return;
@@ -86,9 +85,7 @@ export function CompoundNode({ cyRef }: CompoundNodeProps) {
   }, [menu]);
 
   const handleCollapse = useCallback(() => {
-    if (!menu) return;
-    const cy = cyRef.current;
-    if (!cy) return;
+    if (!menu || !cy) return;
 
     const nodeId = menu.nodeId;
     const node = cy.getElementById(nodeId);
@@ -129,10 +126,9 @@ export function CompoundNode({ cyRef }: CompoundNodeProps) {
     if (layout !== 'grid') {
       cy.layout({ name: layout, animate: true, animationDuration: 500 } as any).run();
     }
-  }, [menu, cyRef, collapseNeighbors, layout]);
+  }, [menu, cy, collapseNeighbors, layout]);
 
   useEffect(() => {
-    const cy = cyRef.current;
     if (!cy) return;
 
     const handleDbltap = (evt: EventObject) => {
@@ -190,7 +186,7 @@ export function CompoundNode({ cyRef }: CompoundNodeProps) {
 
     cy.on('dbltap', 'node[type="compound"]', handleDbltap);
     return () => { cy.off('dbltap', 'node[type="compound"]', handleDbltap); };
-  }, [cyRef, expandGroup]);
+  }, [cy, expandGroup]);
 
   if (!menu) return null;
 

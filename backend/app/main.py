@@ -28,16 +28,22 @@ app.add_exception_handler(AppError, app_error_handler)
 async def catch_all_handler(request, exc):
     return JSONResponse(
         status_code=500,
-        content={"error": "INTERNAL_ERROR", "message": str(exc), "request_id": getattr(request.state, "request_id", "")},
+        content={"error": "INTERNAL_ERROR", "message": "An unexpected error occurred", "request_id": getattr(request.state, "request_id", "")},
     )
 
 
 @app.on_event("startup")
 async def startup():
+    import logging
     validate_config_on_startup()
     import asyncio
     from app.db.neo4j import verify_indexes
-    asyncio.create_task(verify_indexes())
+    task = asyncio.create_task(verify_indexes())
+    task.add_done_callback(
+        lambda t: logging.getLogger(__name__).error(
+            "verify_indexes failed: %s", t.exception()
+        ) if t.exception() else None
+    )
 
 
 from app.routers import graph, search, ingest

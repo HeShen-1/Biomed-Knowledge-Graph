@@ -15,11 +15,11 @@ async def search_entities(query: str, entity_type: str | None, min_relevance: fl
                        ROW_NUMBER() OVER (PARTITION BY type ORDER BY ts_rank(search_vector, q.tq) DESC) AS rn
                 FROM entities_search, q
                 WHERE search_vector @@ q.tq
-                  AND ts_rank(search_vector, q.tq) >= $3
+                  AND ts_rank(search_vector, q.tq) >= $2
             ) ranked
-            WHERE rn <= $4
+            WHERE rn <= $3
             ORDER BY relevance DESC
-            LIMIT $5
+            LIMIT $4
         """, query, min_relevance, per_type, limit)
     else:
         rows = await pool.fetch("""

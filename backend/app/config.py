@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     postgres_dsn: str = ""
 
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://localhost:6380/0"
 
     ncbi_api_key: str = ""
 

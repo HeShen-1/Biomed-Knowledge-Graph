@@ -37,7 +37,7 @@ Neo4j (图数据库) ← FastAPI (后端) → React + Cytoscape.js (前端)
 │   │   └── stats.py             # 同步统计
 │   ├── tasks/                   # Celery worker (solo pool for Windows)
 │   ├── migrations/              # SQL 建表/索引
-│   └── tests/                   # pytest 18 tests (unit + snapshot)
+│   └── tests/                   # pytest 58 tests (unit + snapshot, all pass)
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                 # 纯 TS axios 封装 (EdgeData 含 source_id/target_id)
@@ -182,7 +182,7 @@ Article ──[:MENTIONS]──→ Gene / Disease
 |------|------|
 | 后端开发 | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload` |
 | 前端开发 | `cd frontend && npm run dev` |
-| 后端测试 | `cd backend && python -m pytest tests/ -v` (18 tests) |
+| 后端测试 | `cd backend && python -m pytest tests/ -v` (58 pass) |
 | 前端测试 | `cd frontend && npx vitest run` |
 | E2E 测试 | `cd frontend && npx playwright test` |
 | Python lint | `cd backend && ruff check .` |
@@ -191,10 +191,17 @@ Article ──[:MENTIONS]──→ Gene / Disease
 
 ## 已知限制
 
-- STRING/ChEMBL 蛋白 ID 与 UniProt accession 体系不统一 (需 Resolver)
-- OpenTargets 仅取每疾病 1 页 (200 条) for dev
-- UniProt ASSOCIATED_WITH 边未包含 (现有数据缺少疾病注释)
-- anime.js + cytoscape 未做代码分割 (~700KB bundle)
+### 已解决
+- ~~STRING/ChEMBL 蛋白 ID 与 UniProt accession 体系不统一~~ → 已解决（gene resolver `ingest/resolvers/gene.py`；target resolver 部分覆盖）
+- ~~OpenTargets 仅取每疾病 1 页~~ → 已解决（完整分页）
+- ~~UniProt ASSOCIATED_WITH 边未包含~~ → 已解决（UniProt ingester 解析疾病注释并创建边）
+- ~~anime.js + cytoscape 未做代码分割~~ → 已解决（CytoscapeRenderer 通过 `React.lazy()` 懒加载）
+
+### 待解决
+- 无应用层测试（service/router 集成测试），仅有单元测试和快照测试
+- `/api/ingest/sync` 端点未加认证保护
+- 无速率限制中间件
+- docker-compose 中 Redis 无持久化配置（AOF/RDB），Celery 任务状态重启丢失
 
 ## License
 

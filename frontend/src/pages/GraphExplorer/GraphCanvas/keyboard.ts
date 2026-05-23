@@ -27,16 +27,14 @@ function isInputFocused(): boolean {
   return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).contentEditable === 'true';
 }
 
-export function useKeyboard(cyRef: React.MutableRefObject<Core | null>) {
+export function useKeyboard(cy: Core | null) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const inputFocused = isInputFocused();
 
-      if (inputFocused && e.key !== 'Escape' && !(e.ctrlKey && e.key === 'k')) {
+      if (inputFocused && e.key !== 'Escape') {
         return;
       }
-
-      const cy = cyRef.current;
       const uiStore = useUiStore.getState();
 
       // Delete / Backspace — remove selected nodes
@@ -173,14 +171,10 @@ export function useKeyboard(cyRef: React.MutableRefObject<Core | null>) {
         return;
       }
 
-      // Ctrl+K — focus search
-      if (e.ctrlKey && e.key === 'k') {
-        e.preventDefault();
-        document.querySelector<HTMLInputElement>('input[data-search]')?.focus();
-      }
+      // Ctrl+K handled by SearchInput's own listener
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cyRef]);
+  }, [cy]);
 }

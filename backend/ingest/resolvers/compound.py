@@ -20,7 +20,7 @@ async def _fetch_one(chembl_id: str) -> dict:
         response = await client.get(f"{BASE_URL}/{chembl_id}.json")
         response.raise_for_status()
         data = response.json()
-    except (httpx.HTTPError, httpx.TimeoutException):
+    except (httpx.HTTPError, httpx.TimeoutException, ValueError):
         return {"molecule_chembl_id": chembl_id}
 
     return {

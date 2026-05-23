@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
 import { animate } from 'animejs';
 import { useCytoscapeState } from '@/hooks/useCytoscapeState';
@@ -21,18 +21,18 @@ function shortLabel(raw: string, max = 18): string {
 }
 
 interface CytoscapeRendererProps {
-  cyRef?: React.MutableRefObject<Core | null>;
+  onReady?: (cy: Core) => void;
 }
 
-export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererProps) {
+export function CytoscapeRenderer({ onReady }: CytoscapeRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const internalCyRef = useRef<Core | null>(null);
-  const cyRef = externalCyRef ?? internalCyRef;
+  const [cy, setCy] = useState<Core | null>(null);
   const prevNodeIdsRef = useRef<Set<string>>(new Set());
+  const handleSelectRef = useRef<((evt: cytoscape.EventObject) => void) | null>(null);
   const { nodes, edges, layout, setSelectedNode, theme } = useCytoscapeState();
 
-  useKeyboard(cyRef);
-  const { rect: boxRect } = useBoxSelect(cyRef.current);
+  useKeyboard(cy);
+  const { rect: boxRect } = useBoxSelect(cy);
 
   const dark = theme === 'dark';
   const canvasBg = dark ? '#0d1117' : '#ffffff';
@@ -45,7 +45,6 @@ export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererPro
     const node = evt.target;
     const pos = node.renderedPosition();
 
-    const cy = cyRef.current;
     if (cy) {
       const el = cy.container();
       if (el) {
@@ -84,11 +83,14 @@ export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererPro
         description: node.data('description'),
       },
     });
-  }, [setSelectedNode]);
+  }, [cy, setSelectedNode]);
+
+  // Keep a ref to the latest handleSelect so the cy event listener never goes stale
+  handleSelectRef.current = handleSelect;
 
   useEffect(() => {
-    if (!containerRef.current || cyRef.current) return;
-    const cy = cytoscape({
+    if (!containerRef.current || cy) return;
+    const instance = cytoscape({
       container: containerRef.current,
       style: [
         {
@@ -96,14 +98,14 @@ export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererPro
           style: {
             'background-color': '#0f62fe',
             'label': 'data(label)',
-            'font-size': '9px',
+            'font-size': '11px',
             'font-family': 'IBM Plex Sans, sans-serif',
-            'font-weight': 500 as any,
+            'font-weight': 500,
             'color': labelColor,
             'text-valign': 'bottom',
             'text-halign': 'center',
             'text-margin-y': 4,
-            'text-wrap': 'ellipsis' as any,
+            'text-wrap': 'ellipsis',
             'text-max-width': '70px',
             'min-zoomed-font-size': '7px',
             'border-width': '1.5px',
@@ -130,15 +132,15 @@ export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererPro
             'width': 34,
             'height': 34,
             'font-size': '10px',
-            'font-weight': 'bold' as any,
+            'font-weight': 'bold',
           },
         },
         {
           selector: 'node:selected',
           style: {
-            'border-width': '3px',
+            'border-width': '4px',
             'border-color': selectedBorder,
-            'text-outline-width': '3px',
+            'text-outline-width': '4px',
             'text-outline-color': textOutline,
           },
         },
@@ -146,11 +148,16 @@ export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererPro
           selector: 'edge',
           style: {
             'line-color': edgeColor,
-            'width': 0.8,
+            'width': 1.0,
             'target-arrow-color': edgeColor,
             'target-arrow-shape': 'triangle',
             'arrow-scale': 0.7,
             'curve-style': 'bezier',
+            'label': 'data(relation)',
+            'font-size': '7px',
+            'color': edgeColor,
+            'text-opacity': 0.5,
+            'text-rotation': 'autorotate',
           },
         },
         {
@@ -166,18 +173,20 @@ export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererPro
           style: { 'line-color': '#f1c21b33', 'width': 1.0 },
         },
       ],
-      layout: { name: 'cose' } as any,
+      layout: { name: 'cose' },
     });
-    cyRef.current = cy;
-    if (externalCyRef) externalCyRef.current = cy;
+    setCy(instance);
+    onReady?.(instance);
 
-    cy.on('tap', 'node', handleSelect);
-    return () => { cy.destroy(); cyRef.current = null; if (externalCyRef) externalCyRef.current = null; };
-  }, [handleSelect]);
+    const onTap = (evt: cytoscape.EventObject) => {
+      handleSelectRef.current?.(evt);
+    };
+    instance.on('tap', 'node', onTap);
+    return () => { instance.destroy(); setCy(null); };
+  }, []);
 
   // Update theme-dependent styles
   useEffect(() => {
-    const cy = cyRef.current;
     if (!cy) return;
     cy.style()
       .selector('node')
@@ -228,7 +237,6 @@ export function CytoscapeRenderer({ cyRef: externalCyRef }: CytoscapeRendererPro
   }, [nodes, edges]);
 
   useEffect(() => {
-    const cy = cyRef.current;
     if (!cy) return;
 
     if (elements.length === 0) {

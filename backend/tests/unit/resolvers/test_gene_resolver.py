@@ -111,7 +111,7 @@ async def test_resolve_gene_symbol_fallback_hit_without_accession():
 @pytest.mark.asyncio
 async def test_resolve_gene_symbol_empty_input():
     result = await resolve_gene_symbol("")
-    assert result == "protein:"
+    assert result == "protein:UNKNOWN"
 
 
 @pytest.mark.asyncio

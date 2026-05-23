@@ -1,7 +1,7 @@
 from app.db.neo4j import get_neo4j_driver
 from app.models.graph import NodeModel, EdgeModel, NodeDetailResponse, SubgraphModel
-from app.errors import EntityNotFoundError, GraphTimeoutError
-from typing import Optional
+from app.errors import EntityNotFoundError, GraphTimeoutError, InvalidParamError
+from app.config import settings
 
 NODE_TYPE_MAP = {
     "gene": "Gene",
@@ -60,6 +60,10 @@ async def get_node_detail(node_type: str, node_id: str, limit: int = 100) -> Nod
 
 
 async def expand_node(node_type: str, node_id: str, depth: int, limit: int) -> SubgraphModel:
+    if depth < 1 or depth > settings.graph_max_depth:
+        raise InvalidParamError(f"depth must be between 1 and {settings.graph_max_depth}")
+    if limit < 1 or limit > settings.graph_max_limit:
+        raise InvalidParamError(f"limit must be between 1 and {settings.graph_max_limit}")
     label = NODE_TYPE_MAP.get(node_type)
     full_id = node_id if ":" in node_id else f"{node_type}:{node_id}"
     driver = await get_neo4j_driver()
@@ -120,6 +124,8 @@ async def expand_node(node_type: str, node_id: str, depth: int, limit: int) -> S
 
 
 async def find_path(from_type: str, from_id: str, to_type: str, to_id: str, max_length: int) -> SubgraphModel:
+    if max_length < 1 or max_length > settings.graph_max_depth:
+        raise InvalidParamError(f"max_length must be between 1 and {settings.graph_max_depth}")
     from_label = NODE_TYPE_MAP.get(from_type)
     to_label = NODE_TYPE_MAP.get(to_type)
     full_from = from_id if ":" in from_id else f"{from_type}:{from_id}"
