@@ -9,3 +9,7 @@ build/
 *.egg-info/
 .pytest_cache/
 coverage/
+.codegraph/
+memory/
+*.tsbuildinfo
+.claude/settings.local.json
